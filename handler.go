@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+// Encoding identifies the kind of encoding used on the response.
+type Encoding int
+
+// definitions of the available encoding method.
+const (
+	unknown Encoding = iota
+	Header
+	Body
+)
+
+var encoding = Header
+
 // ErrHeader is the header key written on response
 const ErrHeader = "X-App-Error"
 
@@ -22,17 +34,17 @@ var DefaultDBNotFoundHandler DBNotFoundHandler = func(_ error) bool {
 // Handle check if error is of type APIError (using errors.As and errors.Unwrap functions)
 // and writes the following information on ResponseWriter:
 //
-//  - APIErr.StatusCode(): the http status code
-//  - http.StatusText(APIErr.StatusCode()): the http status text from status code
-//  - ErrHeader header if APIErr.Extra() is present (see APIErr for more details)
+//   - APIErr.StatusCode(): the http status code
+//   - http.StatusText(APIErr.StatusCode()): the http status text from status code
+//   - ErrHeader header if APIErr.Extra() is present (see APIErr for more details)
 //
 // When the status code is not a client or server error (e.g. 204 no content) it will be handled without the use of http.Error.
 // The http.ResponseWriter WriteHeader function will be invoked.
 //
 // returns true if err is of type APIErr.
 func Handle(err error, w http.ResponseWriter) bool {
-	ae, ok := extractAPIErr(err)
-	if !ok {
+	ae := extractAPIErr(err)
+	if ae == nil {
 		return false
 	}
 	if ae.extras {
@@ -69,13 +81,13 @@ func HandleISE(err error, w http.ResponseWriter, r *http.Request) {
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
-func extractAPIErr(err error) (*APIErr, bool) {
+func extractAPIErr(err error) *APIErr {
 	var ae *APIErr
 	for err != nil {
 		if errors.As(err, &ae) {
-			return ae, true
+			return ae
 		}
 		err = errors.Unwrap(err)
 	}
-	return nil, false
+	return nil
 }
