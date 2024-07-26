@@ -1,7 +1,6 @@
 package apierr
 
 import (
-	"fmt"
 	"schneider.vip/problem"
 )
 
@@ -71,42 +70,4 @@ func (h HttpStatus) Problem(title string) *problem.Problem {
 
 func (h HttpStatus) Problemf(title string, args ...any) *problem.Problem {
 	return problem.Of(int(h)).Append(problem.Titlef(title, args...))
-}
-
-// ErrTxt wraps apierr.FromText.
-// The extra parameter can be empty.
-func (h HttpStatus) ErrTxt(text string, extra ...any) error {
-	return FromText(text, int(h), fmtArgs(extra)...)
-}
-
-// Err wraps apierr.New with the http status code and no extra.
-func (h HttpStatus) Err(err error, extra ...any) error {
-	return New(err, int(h), fmtArgs(extra)...)
-}
-
-// ClientErr wrap `text` using apierr.FromText and prepends Prefix to clientErr.
-//
-//	Example:
-//	arg1 := 1
-//	arg2 := "test"
-//	japi.Conflict.ErrTxt("duplicate entry", "jarvis.backend.errors.myentity.myerrkey", arg1, arg2)
-//
-//	// without specify the prefix
-//	japi.Conflict.ClientErr("duplicate entry", "myentity.myerrkey", arg1, arg2)
-func (h HttpStatus) ClientErr(text string, clientErr string, extra ...any) error {
-	key := fmtKey(clientErr)
-	args := append([]any{key}, extra...)
-	return h.ErrTxt(text, args...)
-}
-
-func fmtArgs(values []any) []string {
-	formatted := make([]string, 0, len(values))
-	for _, v := range values {
-		formatted = append(formatted, fmt.Sprint(v))
-	}
-	return formatted
-}
-
-func fmtKey(clientErr string) string {
-	return fmt.Sprintf("%s.%s", Prefix, clientErr)
 }
