@@ -3,23 +3,8 @@ package apierr
 import (
 	"errors"
 	"net/http"
-	"strings"
+	"schneider.vip/problem"
 )
-
-// Encoding identifies the kind of encoding used on the response.
-type Encoding int
-
-// definitions of the available encoding method.
-const (
-	unknown Encoding = iota
-	Header
-	Body
-)
-
-var encoding = Header
-
-// ErrHeader is the header key written on response
-const ErrHeader = "X-App-Error"
 
 // DBNotFoundHandler is the checker function used from HandleISE for
 // DB record not found errors. DefaultDBNotFoundHandler should be overridden
@@ -31,46 +16,23 @@ var DefaultDBNotFoundHandler DBNotFoundHandler = func(_ error) bool {
 	return false
 }
 
-// Handle check if error is of type APIError (using errors.As and errors.Unwrap functions)
-// and writes the following information on ResponseWriter:
-//
-//   - APIErr.StatusCode(): the http status code
-//   - http.StatusText(APIErr.StatusCode()): the http status text from status code
-//   - ErrHeader header if APIErr.Extra() is present (see APIErr for more details)
-//
-// When the status code is not a client or server error (e.g. 204 no content) it will be handled without the use of http.Error.
-// The http.ResponseWriter WriteHeader function will be invoked.
-//
-// returns true if err is of type APIErr.
+// Handle err as a problem.Problem. The error is unwrapped recursively until is nil.
+// If a problem.Problem is not found, then return false, otherwise writes the response
+// and return true.
 func Handle(err error, w http.ResponseWriter) bool {
-	ae := extractAPIErr(err)
+	ae := extractProblem(err)
 	if ae == nil {
 		return false
 	}
-	if ae.extras {
-		w.Header().Add(ErrHeader, ae.mergeExtra())
-	}
-	for k, values := range ae.customHeaders {
-		w.Header().Add(k, strings.Join(values, ","))
-	}
-	statusCode := ae.StatusCode()
-	// handle with http.Error only if is a client or server error
-	if statusCode >= 400 && statusCode < 600 {
-		http.Error(w, http.StatusText(statusCode), statusCode)
-		return true
-	}
-	w.WriteHeader(statusCode)
+	_, _ = ae.WriteTo(w)
 	return true
 }
 
-// HandleISE executes Handle().
-// If Handle() returns false executes DefaultDBNotFoundHandler that handles common db "not found" errors.
+// HandleISE executes Handle.
+// When Handle return false then executes DefaultDBNotFoundHandler; the last one handles common db "not found" errors.
 //
-// If the error is unknown (not an APIErr nor a DBNotFoundErr) it will reply with Internal Server Error.
-func HandleISE(err error, w http.ResponseWriter, r *http.Request) {
-	for _, decorator := range decorators {
-		decorator(w, r)
-	}
+// If the error is unknown (not a Problem nor a DBNotFoundErr) it will reply with Internal Server Error.
+func HandleISE(err error, w http.ResponseWriter) {
 	if Handle(err, w) {
 		return
 	}
@@ -81,8 +43,8 @@ func HandleISE(err error, w http.ResponseWriter, r *http.Request) {
 	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
-func extractAPIErr(err error) *APIErr {
-	var ae *APIErr
+func extractProblem(err error) *problem.Problem {
+	var ae *problem.Problem
 	for err != nil {
 		if errors.As(err, &ae) {
 			return ae

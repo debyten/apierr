@@ -2,6 +2,7 @@ package apierr
 
 import (
 	"fmt"
+	"schneider.vip/problem"
 )
 
 // Prefix used by all errors that must be presented to
@@ -62,6 +63,15 @@ const (
 	NotExtended                   HttpStatus = 510
 	NetworkAuthenticationRequired HttpStatus = 511
 )
+
+// Problem convert the HttpStatus to a problem.Problem.
+func (h HttpStatus) Problem(title string) *problem.Problem {
+	return h.Problemf(title)
+}
+
+func (h HttpStatus) Problemf(title string, args ...any) *problem.Problem {
+	return problem.Of(int(h)).Append(problem.Titlef(title, args...))
+}
 
 // ErrTxt wraps apierr.FromText.
 // The extra parameter can be empty.

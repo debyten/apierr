@@ -1,34 +1,27 @@
 # apierr
 
-This lib permits to create APIErrors avoiding to manage the error on the api side. Supports error check and error unwrapping.
+This library is a utility for creating errors with the use of standard http status codes.
+The built error is a `Problem` (from `schneider.vip/problem`).
 
-Compatible with [go-kit](https://github.com/go-kit/kit).
+The error handling on the api side will be simplified as follows:
 
-### Example of usage
-```
-var errInvalidAge = fmt.Errorf("invalid age")
-var errSameAge = fmt.Errorf("same age")
-func (svc *UserService) UpdateUserAge(id, age int) error {
-  user, err := svc.repository.FindById(id)
-  // if err != nil ...
-  if user.age == age {
-    return apierr.New(errSameAge, http.StatusConflict)
-  }
-  // and so on...
+```go
+package main
+
+import (
+	"github.com/debyten/apierr"
+	"net/http"
+)
+
+func exampleErr() error {
+	return apierr.NotFound.Problem("entity not found")
+}
+
+func myHandler(w http.ResponseWriter, r *http.Request) {
+	err := exampleErr()
+	if err != nil {
+        apierr.HandleISE(err, w)
+		return
+	}
 }
 ```
-### And on the Api resource
-
-```
-func (api *UserApi) HandleChangeAge(w http.ResponseWriter, r *http.Request) {
-  // retrieve id, age...
-  if err := api.userService.UpdateUserAge(id, age); err != nil {
-    apierr.HandleISE(err, w)
-    return
-  }
-}
-```
-
-The `HandleChangeAge` will write `409 Conflict` on the response.
-
-Check the godoc for more information about usage/functionalities as Custom headers, decorators, ...
